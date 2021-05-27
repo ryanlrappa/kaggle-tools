@@ -4,7 +4,7 @@ import itertools
 from matplotlib import cm
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import RandomizedSearchCV, TimeSeriesSplit, RandomizedSearchCV
+from sklearn.model_selection import RandomizedSearchCV, TimeSeriesSplit
 from sklearn.metrics import confusion_matrix, make_scorer, roc_auc_score, average_precision_score, classification_report, roc_curve, precision_recall_curve
 from sklearn.linear_model import LogisticRegression, SGDClassifier
 
