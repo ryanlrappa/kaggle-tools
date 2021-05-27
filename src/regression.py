@@ -3,7 +3,7 @@ import numpy as np
 from scipy import stats
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import RandomizedSearchCV
 from sklearn.linear_model import ElasticNet, Lasso, RANSACRegressor, SGDRegressor
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score, make_scorer, median_absolute_error
 
@@ -54,9 +54,9 @@ class Regression:
             print("Target includes negative values, log(y) attribute not generated.")
 
 
-    def elastic_net(self, alphas, l1_ratios, folds, log_y=False): #slow (75 models -> 7 min)
+    def elastic_net(self, alphas, l1_ratios, folds, log_y=False): #slow
         '''
-        Runs parallelized GridSearchCV for elastic net regression
+        Runs parallelized RandomizedSearchCV for elastic net regression
         over the specified alphas and l1_ratios.
 
         Args:
@@ -66,39 +66,30 @@ class Regression:
             log_y (bool): Default False, set to True to model on log(y) instead of y.
 
         Returns:
-            model (obj): GridSearchCV optimized elastic net model.
+            model (obj): RandomizedSearchCV optimized elastic net model.
             preds (np array): Predicted values of target.
 
         Raises:
             ~in progress~
         '''
-        if log_y == False: #not using log(y)
-            parameters = {'l1_ratio': l1_ratios, 'alpha': alphas}
-            elastic_net = ElasticNet()
-            scoring = make_scorer(mean_squared_error, greater_is_better=False) #so GridSearch settles on min MSE, not max R^2 which is default
-            model = GridSearchCV(elastic_net, parameters, scoring=scoring, cv=folds, n_jobs=-1)
+        parameters = {'l1_ratio': l1_ratios, 'alpha': alphas}
+        elastic_net = ElasticNet()
+        scoring = make_scorer(mean_squared_error, greater_is_better=False) #so Search finds min MSE, not max R^2 (default)
+        model = RandomizedSearchCV(elastic_net, parameters, scoring=scoring, cv=folds, n_jobs=-1)
+        if log_y == False:
             model.fit(self.X_scaled, self.y)
-            preds = model.predict(self.X_scaled)
-            print("-------- BEST MODEL --------")
-            print(model.best_estimator_)
-            print("-------- ---------- --------")
-            return model, preds
         else: #using log(y)
-            parameters = {'l1_ratio': l1_ratios, 'alpha': alphas}
-            elastic_net = ElasticNet()
-            scoring = make_scorer(mean_squared_error, greater_is_better=False) #so GridSearch settles on min MSE, not max R^2 which is default
-            model = GridSearchCV(elastic_net, parameters, scoring=scoring, cv=folds, n_jobs=-1)
             model.fit(self.X_scaled, self.y_log)
-            preds = model.predict(self.X_scaled)
-            print("-------- BEST MODEL --------")
-            print(model.best_estimator_)
-            print("-------- ---------- --------")
-            return model, preds
+        preds = model.predict(self.X_scaled)
+        print("-------- BEST MODEL --------")
+        print(model.best_estimator_)
+        print("-------- ---------- --------")
+        return model, preds
 
 
-    def elastic_net_sgd(self, alphas, l1_ratios, folds, log_y=False): #faster, more robust (75 models -> 30 sec)
+    def elastic_net_sgd(self, alphas, l1_ratios, folds, log_y=False): #faster, more robust
         '''
-        Runs parallelized GridSearchCV for SGD optimized elastic net regression
+        Runs parallelized RandomizedSearchCV for SGD optimized elastic net regression
         over the specified alphas and l1_ratios.
 
         Notes:
@@ -114,86 +105,61 @@ class Regression:
             log_y (bool): Default False, set to True to model on log(y) instead of y.
 
         Returns:
-            model (obj): GridSearchCV optimized elastic net model.
+            model (obj): RandomizedSearchCV optimized elastic net model.
             preds (np array): Predicted values of target.
 
         Raises:
             ~in progress~
         '''
-        if log_y == False: #not using log(y)
-            parameters = {'l1_ratio': l1_ratios, 'alpha': alphas}
-            elastic_net = SGDRegressor(penalty='elasticnet')
-            scoring = make_scorer(mean_squared_error, greater_is_better=False) #so GridSearch settles on min MSE, not max R^2 which is default
-            model = GridSearchCV(elastic_net, parameters, scoring=scoring, cv=folds, n_jobs=-1)
+        parameters = {'l1_ratio': l1_ratios, 'alpha': alphas}
+        elastic_net = SGDRegressor(penalty='elasticnet')
+        scoring = make_scorer(mean_squared_error, greater_is_better=False) #so Search finds min MSE, not max R^2 (default)
+        model = RandomizedSearchCV(elastic_net, parameters, scoring=scoring, cv=folds, n_jobs=-1)
+        if log_y == False: 
             model.fit(self.X_scaled, self.y)
-            preds = model.predict(self.X_scaled)
-            print("-------- BEST MODEL --------")
-            print(model.best_estimator_)
-            print("-------- ---------- --------")
-            return model, preds
         else: #using log(y)
-            parameters = {'l1_ratio': l1_ratios, 'alpha': alphas}
-            elastic_net = SGDRegressor(penalty='elasticnet')
-            scoring = make_scorer(mean_squared_error, greater_is_better=False) #so GridSearch settles on min MSE, not max R^2 which is default
-            model = GridSearchCV(elastic_net, parameters, scoring=scoring, cv=folds, n_jobs=-1)
             model.fit(self.X_scaled, self.y_log)
-            preds = model.predict(self.X_scaled)
-            print("-------- BEST MODEL --------")
-            print(model.best_estimator_)
-            print("-------- ---------- --------")
-            return model, preds
+        preds = model.predict(self.X_scaled)
+        print("-------- BEST MODEL --------")
+        print(model.best_estimator_)
+        print("-------- ---------- --------")
+        return model, preds
 
 
     def ransac(self, folds, log_y=False):
         '''For making predictions that are robust to outliers.
 
-        Runs parallelized GridSearchCV on a RANSAC regressor
+        Runs parallelized RandomizedSearchCV on a RANSAC regressor
         over two possible values for min_samples.
 
         Args:
             folds (int): Number of folds to use in cross validation.
 
         Returns:
-            model (obj): GridSearchCV optimized RANSAC model.
+            model (obj): RandomizedSearchCV optimized RANSAC model.
             preds (np array): Predicted values of target.
 
         '''
+        #calculating min_samples (N) based on standard academic approach
+        e = round(len(self.df[~(np.abs(stats.zscore(self.df)) < 3).all(axis=1)])/len(self.df), 4) #prob of outlier
+        p = 0.99 #desired prob that at least one random sample is all inliers
+        s = 2 #min num of points needed to fit model
+        N = round(np.log10(1-p) / np.log10(1 - (1-e)**s))
+        #comparing N to default setting for min_samples
+        default = self.X.shape[1]+1
+        parameters = {'min_samples': [default, N]}
+        ransac = RANSACRegressor()
+        scoring = make_scorer(median_absolute_error, greater_is_better=False)
+        model = RandomizedSearchCV(ransac, parameters, scoring=scoring, cv=folds, n_jobs=-1)
         if log_y == False: #not using log(y)
-            #calculating min_samples (N) based on standard academic approach
-            e = round(len(self.df[~(np.abs(stats.zscore(self.df)) < 3).all(axis=1)])/len(self.df), 4) #prob of outlier
-            p = 0.99 #desired prob that at least one random sample is all inliers
-            s = 2 #min num of points needed to fit model
-            N = round(np.log10(1-p) / np.log10(1 - (1-e)**s))
-            #comparing N to default setting for min_samples
-            default = self.X.shape[1]+1
-            parameters = {'min_samples': [default, N]}
-            ransac = RANSACRegressor()
-            scoring = make_scorer(median_absolute_error, greater_is_better=False)
-            model = GridSearchCV(ransac, parameters, scoring=scoring, cv=folds, n_jobs=-1)
             model.fit(self.X_scaled, self.y)
-            preds = model.predict(self.X_scaled)
-            print("-------- BEST MODEL --------")
-            print(model.best_estimator_)
-            print("-------- ---------- --------")
-            return model, preds
         else: #using log(y)
-            #calculating min_samples (N) based on standard academic approach
-            e = round(len(self.df[~(np.abs(stats.zscore(self.df)) < 3).all(axis=1)])/len(self.df), 4) #prob of outlier
-            p = 0.99 #desired prob that at least one random sample is all inliers
-            s = 2 #min num of points needed to fit model
-            N = round(np.log10(1-p) / np.log10(1 - (1-e)**s))
-            #comparing N to default setting for min_samples
-            default = self.X.shape[1]+1
-            parameters = {'min_samples': [default, N]}
-            ransac = RANSACRegressor()
-            scoring = make_scorer(median_absolute_error, greater_is_better=False)
-            model = GridSearchCV(ransac, parameters, scoring=scoring, cv=folds, n_jobs=-1)
             model.fit(self.X_scaled, self.y_log)
-            preds = model.predict(self.X_scaled)
-            print("-------- BEST MODEL --------")
-            print(model.best_estimator_)
-            print("-------- ---------- --------")
-            return model, preds
+        preds = model.predict(self.X_scaled)
+        print("-------- BEST MODEL --------")
+        print(model.best_estimator_)
+        print("-------- ---------- --------")
+        return model, preds
 
 
     def theil_sen(self):
@@ -207,7 +173,7 @@ class Regression:
         '''Plots model coefficients.
 
         Args:
-            model (obj): GridSearchCV model object.
+            model (obj): RandomizedSearchCV model object.
 
         '''
         coef = pd.Series(model.best_estimator_.coef_, index=self.X_cols)
