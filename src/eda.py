@@ -117,10 +117,10 @@ class EDA:
 
 
 
-#Note on point transparency in seaborn plots:
+# NOTE on point transparency in seaborn plots:
 #Use kwarg scatter_kws={'alpha':0.3}
 
-#Note on ID'ing and removing outliers.
+# NOTE on ID'ing and removing outliers.
 #Do I want to make a function for this?
 # from scipy import stats
 # len(df[~(np.abs(stats.zscore(df)) < 3).all(axis=1)]) #number of rows w/ outliers
