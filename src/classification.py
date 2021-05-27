@@ -4,7 +4,7 @@ import itertools
 from matplotlib import cm
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import GridSearchCV, TimeSeriesSplit
+from sklearn.model_selection import RandomizedSearchCV, TimeSeriesSplit, RandomizedSearchCV
 from sklearn.metrics import confusion_matrix, make_scorer, roc_auc_score, average_precision_score, classification_report, roc_curve, precision_recall_curve
 from sklearn.linear_model import LogisticRegression, SGDClassifier
 
@@ -50,13 +50,12 @@ class Classification:
 
 
     def elastic_net(self, alphas, l1_ratios, folds, imbalanced=False, time_series=False): #slow
-        # NOTE TO SELF: Should I consider class_weight? My 
-        # understanding is that class_weight rescales the 
-        # predicted probabilities, does not change result,
-        # and implies assumptions about cost/benefit anyway,
-        # because it usually trades off recall for precision.
+        # NOTE: Should I consider class_weight? Does
+        # class_weight just rescale the predicted probabilities,
+        # or change result? And does it imply assumptions about
+        # cost/benefit (trades off recall for precision)?
         '''
-        Runs parallelized GridSearchCV for elastic net logistic
+        Runs parallelized RandomizedSearchCV for elastic net logistic
         regression over the specified alphas and l1_ratios.
 
         Notes:
@@ -71,11 +70,11 @@ class Classification:
             time_series (bool): Default False, set to True to use expanding window walk-forward CV.
 
         Returns:
-            model (obj): GridSearchCV optimized elastic net model.
+            model (obj): RandomizedSearchCV optimized elastic net model.
             preds (np array): Predicted values of target.
 
         Raises:
-            ~in progress~
+            # TODO
 
         Example:
             alphas = np.logspace(1, -2, 10)
@@ -86,64 +85,46 @@ class Classification:
         '''
         if time_series == False:
             if imbalanced == False:
-                parameters = {'l1_ratio': l1_ratios, 'C': alphas}
-                elastic_net = LogisticRegression(penalty='elasticnet', solver='saga', max_iter=1000, n_jobs=-1)
                 scoring = make_scorer(roc_auc_score, needs_threshold=True)
-                model = GridSearchCV(elastic_net, parameters, scoring=scoring, cv=folds, n_jobs=-1)
-                model.fit(self.X_scaled, self.y)
-                preds = model.predict(self.X_scaled)
-                print("-------- BEST MODEL --------")
-                print(model.best_estimator_)
-                print("-------- ---------- --------")
-                return model, preds
             else:
-                parameters = {'l1_ratio': l1_ratios, 'C': alphas}
-                elastic_net = LogisticRegression(penalty='elasticnet', solver='saga', max_iter=1000, n_jobs=-1)
                 scoring = make_scorer(average_precision_score, needs_threshold=True)
-                model = GridSearchCV(elastic_net, parameters, scoring=scoring, cv=folds, n_jobs=-1)
-                model.fit(self.X_scaled, self.y)
-                preds = model.predict(self.X_scaled)
-                print("-------- BEST MODEL --------")
-                print(model.best_estimator_)
-                print("-------- ---------- --------")
-                return model, preds
+            parameters = {'l1_ratio': l1_ratios, 'C': alphas}
+            elastic_net = LogisticRegression(penalty='elasticnet', solver='saga', max_iter=1000, n_jobs=-1)
+            scoring = make_scorer(average_precision_score, needs_threshold=True)
+            model = RandomizedSearchCV(elastic_net, parameters, scoring=scoring, cv=folds, n_jobs=-1)
+            model.fit(self.X_scaled, self.y)
+            preds = model.predict(self.X_scaled)
+            print("-------- BEST MODEL --------")
+            print(model.best_estimator_)
+            print("-------- ---------- --------")
+            return model, preds
         else:
             if imbalanced == False:
-                parameters = {'l1_ratio': l1_ratios, 'C': alphas}
-                elastic_net = LogisticRegression(penalty='elasticnet', solver='saga', max_iter=1000, n_jobs=-1)
                 scoring = make_scorer(roc_auc_score, needs_threshold=True)
-                tscv = TimeSeriesSplit(n_splits=folds)
-                model = GridSearchCV(elastic_net, parameters, scoring=scoring, cv=tscv, n_jobs=-1)
-                model.fit(self.X_scaled, self.y)
-                preds = model.predict(self.X_scaled)
-                print("-------- BEST MODEL --------")
-                print(model.best_estimator_)
-                print("-------- ---------- --------")
-                return model, preds
             else:
-                parameters = {'l1_ratio': l1_ratios, 'C': alphas}
-                elastic_net = LogisticRegression(penalty='elasticnet', solver='saga', max_iter=1000, n_jobs=-1)
                 scoring = make_scorer(average_precision_score, needs_threshold=True)
-                tscv = TimeSeriesSplit(n_splits=folds)
-                model = GridSearchCV(elastic_net, parameters, scoring=scoring, cv=tscv, n_jobs=-1)
-                model.fit(self.X_scaled, self.y)
-                preds = model.predict(self.X_scaled)
-                print("-------- BEST MODEL --------")
-                print(model.best_estimator_)
-                print("-------- ---------- --------")
-                return model, preds
+            parameters = {'l1_ratio': l1_ratios, 'C': alphas}
+            elastic_net = LogisticRegression(penalty='elasticnet', solver='saga', max_iter=1000, n_jobs=-1)
+            tscv = TimeSeriesSplit(n_splits=folds)
+            model = RandomizedSearchCV(elastic_net, parameters, scoring=scoring, cv=tscv, n_jobs=-1)
+            model.fit(self.X_scaled, self.y)
+            preds = model.predict(self.X_scaled)
+            print("-------- BEST MODEL --------")
+            print(model.best_estimator_)
+            print("-------- ---------- --------")
+            return model, preds
 
 
     def elastic_net_sgd(self, alphas, l1_ratios, folds, time_series=False): #faster, more robust
         '''
-        Runs parallelized GridSearchCV for SGD optimized elastic net 
+        Runs parallelized RandomizedSearchCV for SGD optimized elastic net 
         logistic regression over the specified alphas and l1_ratios.
         Also optimizes over class_weight 'balanced' vs None.
 
         Notes:
             Predictions are more robust to outliers than plain elastic net,
             but appear to have more bias as well.
-            Does not fit inliers as closely as RF, GB,
+            Does not fit inliers as closely as RF or GB
             so they may be preferable for robust predictions.
 
         Args:
@@ -153,7 +134,7 @@ class Classification:
             time_series (bool): Default False, set to True to use expanding window walk-forward CV.
 
         Returns:
-            model (obj): GridSearchCV optimized elastic net model.
+            model (obj): RandomizedSearchCV optimized elastic net model.
             preds (np array): Predicted values of target.
 
         Raises:
@@ -166,50 +147,37 @@ class Classification:
             model, preds = clf.elastic_net_sgd(alphas, l1_ratios, folds)
         
         '''
+        parameters = {'l1_ratio': l1_ratios, 'alpha': alphas, 'class_weight': [None, 'balanced']}
+        elastic_net = SGDClassifier(loss='log', penalty='elasticnet', n_jobs=-1)
         if time_series == False:
-            parameters = {'l1_ratio': l1_ratios, 'alpha': alphas, 'class_weight': [None, 'balanced']}
-            elastic_net = SGDClassifier(loss='log', penalty='elasticnet', n_jobs=-1)
-            model = GridSearchCV(elastic_net, parameters, cv=folds, n_jobs=-1)
-            model.fit(self.X_scaled, self.y)
-            preds = model.predict(self.X_scaled)
-            print("-------- BEST MODEL --------")
-            print(model.best_estimator_)
-            print("-------- ---------- --------")
-            return model, preds
+            model = RandomizedSearchCV(elastic_net, parameters, cv=folds, n_jobs=-1)
         else:
-            parameters = {'l1_ratio': l1_ratios, 'alpha': alphas, 'class_weight': [None, 'balanced']}
-            elastic_net = SGDClassifier(loss='log', penalty='elasticnet', n_jobs=-1)
             tscv = TimeSeriesSplit(n_splits=folds)
-            model = GridSearchCV(elastic_net, parameters, cv=tscv, n_jobs=-1)
-            model.fit(self.X_scaled, self.y)
-            preds = model.predict(self.X_scaled)
-            print("-------- BEST MODEL --------")
-            print(model.best_estimator_)
-            print("-------- ---------- --------")
-            return model, preds
+            model = RandomizedSearchCV(elastic_net, parameters, cv=tscv, n_jobs=-1)
+        model.fit(self.X_scaled, self.y)
+        preds = model.predict(self.X_scaled)
+        print("-------- BEST MODEL --------")
+        print(model.best_estimator_)
+        print("-------- ---------- --------")
+        return model, preds
 
 
     def coefficient_plot(self, model):
         '''Plots model coefficients.
 
         Args:
-            model (obj): GridSearchCV model object.
+            model (obj): RandomizedSearchCV model object.
 
         '''
         if len(model.best_estimator_.coef_) == 1: #this happens with Logistic Reg coefs
             coef = pd.Series(model.best_estimator_.coef_[0], index=self.X_cols)
-            sorted_coef = coef.sort_values()
-            sorted_coef.plot(kind = "barh", figsize=(12, 9))
-            plt.title("Coefficients in the model")
-            print(sorted_coef[::-1])
-            print("Intercept  ", model.best_estimator_.intercept_)
         else:
             coef = pd.Series(model.best_estimator_.coef_, index=self.X_cols)
-            sorted_coef = coef.sort_values()
-            sorted_coef.plot(kind = "barh", figsize=(12, 9))
-            plt.title("Coefficients in the model")
-            print(sorted_coef[::-1])
-            print("Intercept  ", model.best_estimator_.intercept_)
+        sorted_coef = coef.sort_values()
+        sorted_coef.plot(kind = "barh", figsize=(12, 9))
+        plt.title("Coefficients in the model")
+        print(sorted_coef[::-1])
+        print("Intercept  ", model.best_estimator_.intercept_)
 
 
     def lasso_plot(self, alphas):
