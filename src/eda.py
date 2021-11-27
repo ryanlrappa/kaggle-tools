@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 plt.rcParams.update({'figure.max_open_warning': 200})
 
+
 class EDA:
     '''
     Class for performing basic exploratory data anaysis,
@@ -72,7 +73,7 @@ class EDA:
             for i, col in enumerate(self.df.columns):
                 plt.figure(i)
                 x=self.df[col]
-                sns.distplot(x)
+                sns.displot(x, kde=True)
         else:
             for i, col in zip(range(len(self.df)), self.df.columns):
                 if self.df.iloc[:, i].dtype in ('float64', 'int64'):
@@ -116,7 +117,6 @@ class EDA:
             print("Pearson's r for " + self.y_col + " & " + col + ":", self.df[col].corr(self.df[self.y_col]))
 
 
-
 # NOTE on point transparency in seaborn plots:
 #Use kwarg scatter_kws={'alpha':0.3}
 
@@ -126,3 +126,42 @@ class EDA:
 # len(df[~(np.abs(stats.zscore(df)) < 3).all(axis=1)]) #number of rows w/ outliers
 # round(len(df[~(np.abs(stats.zscore(df)) < 3).all(axis=1)])/len(df), 4) #pct of rows w/ outliers
 # df = df[(np.abs(stats.zscore(df)) < 3).all(axis=1)] #keep only rows w/o outliers
+
+
+def tsplot(y, lags=None, figsize=(10, 8), style='bmh'):
+    import statsmodels.tsa.api as smt
+    import statsmodels.api as sm
+    import scipy.stats as scs
+    if not isinstance(y, pd.Series):
+        y = pd.Series(y)
+    with plt.style.context(style):    
+        fig = plt.figure(figsize=figsize)
+        #mpl.rcParams['font.family'] = 'Ubuntu Mono'
+        layout = (3, 2)
+        ts_ax = plt.subplot2grid(layout, (0, 0), colspan=2)
+        acf_ax = plt.subplot2grid(layout, (1, 0))
+        pacf_ax = plt.subplot2grid(layout, (1, 1))
+        qq_ax = plt.subplot2grid(layout, (2, 0))
+        pp_ax = plt.subplot2grid(layout, (2, 1))
+        
+        y.plot(ax=ts_ax)
+        ts_ax.set_title('Time Series Analysis Plots')
+        smt.graphics.plot_acf(y, lags=lags, ax=acf_ax, alpha=0.5)
+        smt.graphics.plot_pacf(y, lags=lags, ax=pacf_ax, alpha=0.5)
+        sm.qqplot(y, line='s', ax=qq_ax)
+        qq_ax.set_title('QQ Plot')        
+        scs.probplot(y, sparams=(y.mean(), y.std()), plot=pp_ax)
+
+        plt.tight_layout()
+    return 
+
+def adfuller_test(series, sig=0.05, name='', **kwargs):
+    from statsmodels.tsa.stattools import adfuller
+    res = adfuller(series, **kwargs)  # 31 so ADF will check lags up to 30 days   
+    p_value = round(res[1], 3) 
+
+    if p_value <= sig:
+        print(f" {name} : P-Value = {p_value} => Stationary. ")
+    else:
+        # print Non-stationary in bold
+        print(f" {name} : P-Value = {p_value} =>" + "\033[1m" + " Non-stationary." + "\033[0m")
